@@ -5,7 +5,7 @@
 # * Title    : certification checker
 # * Auther   : Alex, Lee
 # * Created  : 2019-07-12
-# * Modified : 2019-08-08
+# * Modified : 2019-09-03
 # * E-mail   : cine0831@gmail.com
 #**/
 #
@@ -17,6 +17,7 @@ SMTPS_PORT=("25")
 CERT_HOME="/usr/mgmt/cert-checker"
 CERT_LOG="${CERT_HOME}/logs"
 TIMEOUT="5"
+IPADDR=$(ip route get 1 | awk '{print $NF; exit}' | grep '^192')
 server_date=$(date +"%Y-%m-%d %H:%M:%S")
 
 # CERT_LOG directory check
@@ -49,6 +50,8 @@ function get_certification {
     local HOST="$1"
     local PROTOCOL="$2"
     local TARGET="$3"
+    local resolver=""
+    local res=""
 
     # HTTPS Protocol
     if [[ "${PROTOCOL}" = "HTTPS" ]]; then
@@ -59,9 +62,15 @@ function get_certification {
                 listen_port="443"
             fi
 
+            # for cURL resolve
+            if [ -n "${IPADDR}" ]; then
+                resolver="--resolve ${HOSTNAME}:${i}:127.0.0.1"
+            fi
+
             if [ "${i}" = "${listen_port}" ]; then
-                x=$(${CURL} -v --insecure --tlsv1 -m ${TIMEOUT} --cert-status --url "https://$HOST:${i}" 2>&1 | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
-                y=$(${CURL} -v --insecure --tlsv1 -m ${TIMEOUT} --cert-status --url "https://$HOST:${i}" 2>&1 | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
+                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "https://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
+                x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
+                y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
             fi
 
             if [[ "${x}" = "" ]] && [[ "${y}" = "" ]]; then
@@ -71,7 +80,7 @@ function get_certification {
 
                 echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
 cat << EOF >> ${CERT_LOG}/${PROTOCOL}-cert.json
-{ "host": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
+{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
 EOF
             fi
 
@@ -90,8 +99,9 @@ EOF
             fi
 
             if [ "${i}" = "${listen_port}" ]; then
-                x=$(${CURL} -v --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url "smtp://$HOST:${i}" 2>&1 | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
-                y=$(${CURL} -v --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url "smtp://$HOST:${i}" 2>&1 | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
+                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url "smtp://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
+                x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
+                y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
             fi
 
             if [[ "${x}" = "" ]] && [[ "${y}" = "" ]]; then
@@ -101,7 +111,7 @@ EOF
 
                 echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
 cat << EOF >> ${CERT_LOG}/${PROTOCOL}-cert.json
-{ "host": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
+{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
 EOF
             fi
 
