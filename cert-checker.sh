@@ -17,7 +17,7 @@ SMTPS_PORT=("25")
 CERT_HOME="/usr/mgmt/cert-checker"
 CERT_LOG="${CERT_HOME}/logs"
 TIMEOUT="5"
-IPADDR=$(ip route get 1 | awk '{print $NF; exit}' | grep '^192')
+IPADDR=$(ip route get 1 | awk '{print $NF; exit}' | egrep '^192|^172')
 server_date=$(date +"%Y-%m-%d %H:%M:%S")
 
 # CERT_LOG directory check
