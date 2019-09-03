@@ -40,7 +40,7 @@ else
 fi
 
 function usage {
-    echo "Usage: $0 -d [domain name] -p [HTTPS or SMTPS] -t [local or remote]"
+    echo "Usage: $0 -d [domain name] -p [https or smtp] -t [local or remote]"
     exit 1;
 }
 
@@ -54,7 +54,7 @@ function get_certification {
     local res=""
 
     # HTTPS Protocol
-    if [[ "${PROTOCOL}" = "HTTPS" ]]; then
+    if [[ "${PROTOCOL}" = "https" ]]; then
         for i in "${HTTPS_PORT[@]}"; do
             if [ "${TARGET}" = "local" ]; then
                 listen_port=$(netstat -nptl | grep '^tcp' | awk '{print $4}' | grep "\:${i}$" | sed -e 's/^\:\://g' | cut -d":" -f 2)
@@ -68,7 +68,7 @@ function get_certification {
             fi
 
             if [ "${i}" = "${listen_port}" ]; then
-                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "https://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
+                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
                 x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
                 y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
             fi
@@ -79,7 +79,7 @@ function get_certification {
                 y=`date --date="${y}" +"%Y-%m-%d"`
 
                 echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
-cat << EOF >> ${CERT_LOG}/${PROTOCOL}-cert.json
+cat << EOF >> ${CERT_LOG}/HTTPS-cert.json
 { "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
 EOF
             fi
@@ -90,7 +90,7 @@ EOF
     fi
 
     # SMTP Protocol
-    if [[ "${PROTOCOL}" = "SMTPS" ]]; then
+    if [[ "${PROTOCOL}" = "smtp" ]]; then
         for i in "${SMTPS_PORT[@]}"; do
             if [ "${TARGET}" = "local" ]; then
                 listen_port=$(netstat -nptl | grep '^tcp' | awk '{print $4}' | grep "\:${i}$" | sed -e 's/^\:\://g' | cut -d":" -f 2)
@@ -99,7 +99,7 @@ EOF
             fi
 
             if [ "${i}" = "${listen_port}" ]; then
-                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url "smtp://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
+                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url ${resolver} "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
                 x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
                 y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
             fi
@@ -110,7 +110,7 @@ EOF
                 y=`date --date="${y}" +"%Y-%m-%d"`
 
                 echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
-cat << EOF >> ${CERT_LOG}/${PROTOCOL}-cert.json
+cat << EOF >> ${CERT_LOG}/SMTP-cert.json
 { "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
 EOF
             fi
@@ -146,7 +146,7 @@ while getopts "h:d:p:t:" arg; do
     esac
 done
 
-if [[ "${protocol}" = "HTTPS" ]] || [[ "${protocol}" = "SMTPS" ]]; then
+if [[ "${protocol}" = "https" ]] || [[ "${protocol}" = "smtp" ]]; then
     get_certification "${domain}" "${protocol}" "${target}"
 else
     echo "${OPTARG} unsupport protocol."
