@@ -12,10 +12,10 @@ check SSL certificate expiration date HTTPS/SMTP
   + curl 7.40 이상 (must enable smtp protocol)
 
 
-### Usage: ./cert-checker.sh -d [ domain name ] -p [ HTTPS or SMTPS ] -t [local or remote]
+### Usage: ./cert-checker.sh -d [ domain name ] -p [ https or smtp ] -t [local or remote]
 | optinon        | explain              |
 |----------------|----------------------|
 | -d             | domain               |
-| -p             | HTTPS or SMTPS       |
+| -p             | https or smtp        |
 | -t             | local or remote      |
 
