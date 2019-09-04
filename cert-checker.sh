@@ -99,7 +99,7 @@ EOF
             fi
 
             if [ "${i}" = "${listen_port}" ]; then
-                res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status --url ${resolver} "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
+                res=$(${CURL} --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
                 x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
                 y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
             fi
