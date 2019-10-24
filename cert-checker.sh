@@ -14,7 +14,7 @@
 
 HTTPS_PORT=("443" "444")
 SMTPS_PORT=("25")
-CERT_HOME="/usr/mgmt/cert-checker"
+CERT_HOME="/usr/local/cert-checker"
 CERT_LOG="${CERT_HOME}/logs"
 TIMEOUT="5"
 IPADDR=$(ip route get 1 | awk '{print $NF; exit}' | egrep '^192|^172')
@@ -29,9 +29,7 @@ elif [ -f ${CERT_LOG} ]; then
 fi
 
 # CURL PATH
-if [ -f /usr/local/library_package/curl/bin/curl ]; then
-    CURL="/usr/local/library_package/curl/bin/curl"
-elif [ -f /usr/local/curl/bin/curl ]; then
+if [ -f /usr/local/curl/bin/curl ]; then
     CURL="/usr/local/curl/bin/curl"
 elif [ -f /usr/local/bin/curl ]; then
     CURL="/usr/local/bin/curl"
