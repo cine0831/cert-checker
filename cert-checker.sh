@@ -2,23 +2,29 @@
 # -*-Shell-script-*-
 #
 #/**
-# * Title    : certification checker
+# * Title    : certification checker script
 # * Auther   : Alex, Lee
 # * Created  : 2019-07-12
-# * Modified : 2019-09-03
+# * Modified : 2019-10-04
 # * E-mail   : cine0831@gmail.com
 #**/
 #
 #set -e
 #set -x
 
-HTTPS_PORT=("443" "444")
-SMTPS_PORT=("25")
-CERT_HOME="/usr/local/cert-checker"
-CERT_LOG="${CERT_HOME}/logs"
-TIMEOUT="5"
-IPADDR=$(ip route get 1 | awk '{print $NF; exit}' | egrep '^192|^172')
-server_date=$(date +"%Y-%m-%d %H:%M:%S")
+function usage {
+    echo "Usage: $0 -d [domain name] -p [https or smtp] -t [local or remote]"
+    exit 1
+}
+
+# checking configuration file
+_conf="/usr/local/cert-checker/cert-checker.conf"
+if [ -f ${_conf} ]; then
+   . ${_conf}
+else
+    echo "${_conf} configuration file isn't."
+    exit 1
+fi
 
 # CERT_LOG directory check
 if [ ! -d ${CERT_LOG} ]; then
@@ -36,11 +42,6 @@ elif [ -f /usr/local/bin/curl ]; then
 else
     CURL="/usr/bin/curl"
 fi
-
-function usage {
-    echo "Usage: $0 -d [domain name] -p [https or smtp] -t [local or remote]"
-    exit 1;
-}
 
 function get_certification {
     local x=""
@@ -69,16 +70,20 @@ function get_certification {
                 res=$(${CURL} -X GET --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
                 x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
                 y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
+                m=$(echo -e "${res}" | grep 'issuer:' | awk '{$1="\b";print}' | sed -e "s/\;/\n/g" | tail -n1 | sed -e 's/CN\=//g' -e 's/^ //g')
             fi
 
-            if [[ "${x}" = "" ]] && [[ "${y}" = "" ]]; then
+            # 보유 도메인 필터링
+            x=$(echo -e "${x}" | egrep "${CERT_LIST}" | tr -d '')
+
+            if [[ "${x}" = "" ]] || [[ "${y}" = "" ]]; then
                 break
             else
                 y=`date --date="${y}" +"%Y-%m-%d"`
 
-                echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
+                echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y} / IS: ${m} / port: ${listen_port}" 
 cat << EOF >> ${CERT_LOG}/HTTPS-cert.json
-{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
+{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "IS": "${m}","port": ${listen_port} }
 EOF
             fi
 
@@ -100,16 +105,20 @@ EOF
                 res=$(${CURL} --verbose --insecure --tlsv1 -m ${TIMEOUT} --ssl --cert-status ${resolver} --url "${PROTOCOL}://$HOST:${i}" 2>&1 | grep -A6 '^* Server certificate:')
                 x=$(echo -e "${res}" | grep 'subject:' | awk '{$1="\b";print}' | awk '{print $NF}' | sed -e 's/CN\=//g')
                 y=$(echo -e "${res}" | grep 'expire date:' | awk '{$1="";print}' | sed -e 's/^\ expire date: //g')
+                m=$(echo -e "${res}" | grep 'issuer:' | awk '{$1="\b";print}' | sed -e "s/\;/\n/g" | tail -n1 | sed -e 's/CN\=//g' -e 's/^ //g')
             fi
+
+            # 보유 도메인 필터링
+            x=$(echo -e "${x}" | egrep "${CERT_LIST}" | tr -d '')
 
             if [[ "${x}" = "" ]] && [[ "${y}" = "" ]]; then
                 break
             else
                 y=`date --date="${y}" +"%Y-%m-%d"`
 
-                echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y}" 
+                echo "Hostname: "${HOSTNAME}" / Domain: ${HOST} / CN: ${x} / notAfter: ${y} / IS: ${m} / port: ${listen_port}" 
 cat << EOF >> ${CERT_LOG}/SMTP-cert.json
-{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "port": ${listen_port} }
+{ "hostname": "${HOSTNAME}", "time": "${server_date}", "domain": "${HOST}", "CN": "${x}", "notAfter": "${y}", "IS": "${m}", "port": ${listen_port} }
 EOF
             fi
 
